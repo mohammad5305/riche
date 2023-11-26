@@ -2,6 +2,14 @@
 
 Riche is a minimalist pastebin tool that draws inspiration from [fiche](https://github.com/solusipse/fiche). Built using Rust, Riche is designed for simplicity, efficiency, and ease of use.
 
+## Installation
+download from `release` section or build from source
+```bash
+git clone https://github.com/mohammad5305/riche.git && cd riche
+cargo build --release
+cp ./target/release/riche /usr/local/bin
+```
+
 ## Usage
 To run the Riche server, use the following command:
 ```bash
