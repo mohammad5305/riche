@@ -6,24 +6,33 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CROSS_VERSION: 0.2.5
+  RUST_VERSION: 1.67.0
 
 jobs:
   build:
-    name: nightly
-    runs-on: ubuntu-latest
-    strategy: 
+    strategy:
+      fail-fast: false
       matrix:
-        target: [ i686-unknown-linux-gnu, x86_64-unknown-linux-gnu, aarch64-linux-android ]
+        include: 
+          - name: linux x86
+            target: i686-unknown-linux-gnu
+            command: cargo 
+            strip: true
+          - name: linux x64
+            target: x86_64-unknown-linux-gnu
+            command: cargo
+            strip: true
+          - name: aarch x64
+            target: aarch64-linux-android
+            command: cross
+            strip: false
+
+
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-          target: ${{ matrix.target }}
+        uses: actions/checkout@v3
 
       # related to https://github.com/actions/runner/issues/2468 
       - name: Set Swap Space
@@ -31,23 +40,32 @@ jobs:
         with:
           swap-size-gb: 10
 
+      - name: install build deps
+        run : |
+          sudo apt -y install build-essential gcc-multilib 
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.3
 
-
-      - name: Install gcc-libs
+      - name: Install Cross
+        if: matrix.command == 'cross'
         run: |
-          sudo apt install gcc-multilib 
+          cargo install --git https://github.com/cross-rs/cross cross
 
-      - name: Build target
-        uses: actions-rs/cargo@v1
+      - name: build
         env:
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
-        with:
-          # use-cross: true
-          command: build
-          args: --release --target ${{ matrix.target }}
+        run: ${{ matrix.command }} build --target=${{ matrix.target }} --release
+
+      - name: strip bin
+        if: matrix.strip
+        run : | 
+          strip target/${{ matrix.target }}/release/riche
 
       - name: Package
         shell: bash
