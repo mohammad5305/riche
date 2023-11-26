@@ -1,14 +1,20 @@
 extern crate clap;
+extern crate log;
 extern crate rand;
+extern crate rouille;
+extern crate std_logger;
 
 use clap::Parser;
+use log::info;
 use rand::seq::IteratorRandom;
+use rouille::{router, Response};
 use std::{
     error::Error,
     fs::{create_dir_all, File},
     io::{Read, Write},
-    net::{TcpListener, TcpStream},
+    net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream},
     path::PathBuf,
+    thread,
     time::Duration,
 };
 
@@ -17,22 +23,30 @@ const SLUG_CHARS: &str = "abcdefghijklmnopqrstuvwxyz0123456789";
 type Result<T> = core::result::Result<T, Box<dyn Error>>;
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about)]
 struct Cli {
-    #[arg(short, long, default_value_t=String::from("127.0.0.1") )]
-    domain: String,
+    #[arg(short, long)]
+    domain: Option<String>,
 
-    #[arg(short, long, default_value_t = 4)]
+    #[arg(short, long, default_value_t = 4, value_name = "NUM")]
     slug_size: u8,
 
-    #[arg(short, long, default_value_t = 30000)]
+    #[arg(short, long, default_value_t = 30000, value_name = "NUM")]
     buffer_size: usize,
 
-    #[arg(short, long)]
+    #[arg(short, long, help = "Pastes directory", value_name = "PATH")]
     output: PathBuf,
 
     #[arg(short, long)]
     port: u16,
+
+    #[arg(
+        short,
+        long,
+        help = "Runs a simple HTTP server for showing pastes on this port (not recommended)",
+        value_name = "PORT"
+    )]
+    webserver: Option<u16>,
 }
 
 fn create_slug(size: u8) -> String {
@@ -60,10 +74,11 @@ fn handle_tcp(
     paste_path: &PathBuf,
     domain: &String,
 ) -> Result<()> {
+    info!("Incoming connection from: {}", stream.peer_addr()?.ip());
     stream.set_read_timeout(Some(Duration::new(5, 0)))?;
     let mut buffer: Vec<u8> = Vec::new();
 
-    if stream.read_to_end(&mut buffer).unwrap_or(0) > buf_limit {
+    if stream.read_to_end(&mut buffer).unwrap_or(buffer.len()) > buf_limit {
         return Ok(());
     }
 
@@ -75,8 +90,40 @@ fn handle_tcp(
 }
 
 fn main() -> Result<()> {
+    std_logger::Config::logfmt()
+        .with_call_location(false)
+        .init();
+
     let args = Cli::parse();
-    let listener = TcpListener::bind("0.0.0.0:".to_owned() + &args.port.to_string())?;
+    let listener = TcpListener::bind(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), args.port))?;
+    info!("Server started listening on: 0.0.0.0:{}", args.port);
+
+    if let Some(port) = args.webserver {
+        let output_dir = args.output.clone();
+        thread::spawn({
+            move || {
+                rouille::start_server(
+                    SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), port),
+                    move |request| {
+                        router!(request,
+                        (GET) (/{slug: String}) => {
+                            if let Ok(file) = File::open(output_dir.join(slug + "/index.txt")) {
+                                Response::from_file("text/plain", file)
+                            }
+                            else {
+                                Response::empty_404()
+                            }
+                        },
+                        _ => Response::empty_404(),
+                        )
+                    },
+                );
+            }
+        });
+    }
+    let domain = &args
+        .domain
+        .unwrap_or(format!("127.0.0.1:{}", &args.webserver.unwrap_or(8080)));
 
     for stream in listener.incoming() {
         handle_tcp(
@@ -84,7 +131,7 @@ fn main() -> Result<()> {
             args.buffer_size,
             args.slug_size,
             &args.output,
-            &args.domain,
+            domain,
         )?;
     }
     Ok(())

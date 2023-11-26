@@ -5,4 +5,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.4.8", default-features = false, features = ["std", "usage", "help", "derive", "error-context"] }
+log = "0.4.20"
 rand = "0.8.5"
+rouille = { version = "3.6.2", default-features = false }
+std-logger = "0.5.2"
