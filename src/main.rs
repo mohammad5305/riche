@@ -111,10 +111,10 @@ fn main() -> Result<()> {
                                 Response::from_file("text/plain", file)
                             }
                             else {
-                                Response::empty_404()
+                                Response::text("ops 404!!!").with_status_code(404)
                             }
                         },
-                        _ => Response::empty_404(),
+                        _ => Response::text("ops 404!!!").with_status_code(404),
                         )
                     },
                 );

@@ -58,6 +58,7 @@ jobs:
       - name: Install Cross
         if: matrix.command == 'cross'
         run: |
+          # wait for next version of cross related to https://github.com/cross-rs/cross/issues/1222
           cargo install --git https://github.com/cross-rs/cross cross
 
       - name: build
