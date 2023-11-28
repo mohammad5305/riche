@@ -6,8 +6,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  CROSS_VERSION: 0.2.5
-  RUST_VERSION: 1.67.0
 
 jobs:
   build:
@@ -15,16 +13,22 @@ jobs:
       fail-fast: false
       matrix:
         include: 
-          - name: linux x86
-            target: i686-unknown-linux-gnu
+          - target: i686-unknown-linux-gnu
             command: cargo 
             strip: true
-          - name: linux x64
-            target: x86_64-unknown-linux-gnu
+          - target: x86_64-unknown-linux-gnu
             command: cargo
             strip: true
-          - name: aarch x64
-            target: aarch64-linux-android
+          - target: aarch64-linux-android
+            command: cross
+            strip: false
+          - target: armv7-linux-androideabi
+            command: cross
+            strip: false
+          - target: x86_64-linux-android
+            command: cross
+            strip: false
+          - target: i686-linux-android
             command: cross
             strip: false
 
