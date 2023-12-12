@@ -1,18 +1,20 @@
 extern crate clap;
+extern crate ipnet;
 extern crate log;
 extern crate rand;
 extern crate rouille;
 extern crate std_logger;
 
 use clap::Parser;
+use ipnet::IpNet;
 use log::info;
 use rand::seq::IteratorRandom;
 use rouille::{router, Response};
 use std::{
     error::Error,
-    fs::{create_dir_all, File},
+    fs::{create_dir_all, read_to_string, File},
     io::{Read, Write},
-    net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream},
+    net::{IpAddr, Ipv4Addr, SocketAddrV4, TcpListener, TcpStream},
     path::PathBuf,
     thread,
     time::Duration,
@@ -39,6 +41,13 @@ struct Cli {
 
     #[arg(short, long)]
     port: u16,
+
+    #[arg(
+        long,
+        help = "list of subnet, ips to not accept connection from",
+        value_name = "PATH"
+    )]
+    blacklist: Option<PathBuf>,
 
     #[arg(
         short,
@@ -84,9 +93,16 @@ fn handle_tcp(
 
     let slug = create_slug(slug_size);
     save_content(paste_path.join(&slug), buffer.as_slice())?;
-    stream.write(format!("http://{domain}/{slug}\n").as_bytes())?;
+    stream.write_all(format!("http://{domain}/{slug}\n").as_bytes())?;
     stream.flush()?;
     Ok(())
+}
+fn parse_blacklist(file: PathBuf) -> Vec<String> {
+    let file = read_to_string(file).unwrap();
+    file.lines()
+        .filter(|s| s.parse::<IpAddr>().is_ok() || s.parse::<IpNet>().is_ok())
+        .map(|s| s.to_string())
+        .collect()
 }
 
 fn main() -> Result<()> {
@@ -124,10 +140,25 @@ fn main() -> Result<()> {
     let domain = &args
         .domain
         .unwrap_or(format!("127.0.0.1:{}", &args.webserver.unwrap_or(8080)));
+    let blacklist: Option<Vec<String>> = args.blacklist.map(parse_blacklist);
 
     for stream in listener.incoming() {
+        let mut stream = stream?;
+        if let Some(blacklist) = &blacklist {
+            let client_ip = stream.try_clone()?.peer_addr()?.ip();
+            if blacklist.iter().any(|i| {
+                if i.contains('/') {
+                    i.parse::<IpNet>().unwrap().contains(&client_ip)
+                } else {
+                    i.parse::<IpAddr>().unwrap() == client_ip
+                }
+            }) {
+                continue;
+            }
+        }
+
         handle_tcp(
-            &mut stream?,
+            &mut stream,
             args.buffer_size,
             args.slug_size,
             &args.output,
