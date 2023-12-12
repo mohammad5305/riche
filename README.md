@@ -3,7 +3,7 @@
 Riche is a minimalist pastebin tool that draws inspiration from [fiche](https://github.com/solusipse/fiche). Built using Rust, Riche is designed for simplicity, efficiency, and ease of use.
 
 ## Installation
-download from `release` section or build from source
+download from the `release` section or build from source
 ```bash
 git clone https://github.com/mohammad5305/riche.git && cd riche
 cargo build --release
@@ -25,7 +25,7 @@ echo "hello, world!" | nc test.com 9999
 The server will return a URL for accessing the pasted code.
 
 ### Blacklist 
-you can pass a list of ip with or without CIDR for blocking, example:
+you can pass a list of ip with or without CIDR for blocking, for example:
 ```bash
 $ cat blacklist.txt
 192.168.8.100
