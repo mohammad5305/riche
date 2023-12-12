@@ -15,22 +15,16 @@ jobs:
         include: 
           - target: i686-unknown-linux-gnu
             command: cargo 
-            strip: true
           - target: x86_64-unknown-linux-gnu
             command: cargo
-            strip: true
           - target: aarch64-linux-android
             command: cross
-            strip: false
           - target: armv7-linux-androideabi
             command: cross
-            strip: false
           - target: x86_64-linux-android
             command: cross
-            strip: false
           - target: i686-linux-android
             command: cross
-            strip: false
 
 
     runs-on: ubuntu-latest
@@ -46,7 +40,7 @@ jobs:
 
       - name: install build deps
         run : |
-          sudo apt -y install build-essential gcc-multilib 
+          sudo apt -y update && sudo apt -y install build-essential gcc-multilib 
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -65,12 +59,8 @@ jobs:
         env:
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
+          CARGO_PROFILE_RELEASE_STRIP: "true"
         run: ${{ matrix.command }} build --target=${{ matrix.target }} --release
-
-      - name: strip bin
-        if: matrix.strip
-        run : | 
-          strip target/${{ matrix.target }}/release/riche
 
       - name: Package
         shell: bash
